@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<!-- 폰으로 받기 페이지: 부스 QR이 r.html?n=<파일 이름>&t=<제목>[&v=mp4|webm 또는 &l=<Litterbox 영상>] 으로 엶. 사진 + "사진 저장", v가 있으면 타임랩스 영상 + "영상 저장" (1시간 뒤 자동 삭제) -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>네컷</title>
+<style>
+body{margin:0;background:#ECEDEF;color:#141518;font-family:system-ui,sans-serif;text-align:center;padding:24px 16px 40px}
+h1{font-size:22px;margin:0 0 16px}
+h2{font-size:18px;margin:36px 0 12px}
+img,video{max-width:100%;max-height:68vh;border-radius:4px;box-shadow:0 10px 30px rgba(20,21,24,.18)}
+button{display:block;width:100%;max-width:360px;margin:22px auto 10px;padding:18px;border:0;border-radius:99px;background:#F28C28;color:#141518;font:700 20px system-ui,sans-serif}
+p{margin:0;color:#4A4E57;font-size:14px;line-height:1.6}
+</style>
+<h1 id="h">네컷</h1>
+<img id="p" alt="네컷 사진">
+<button id="s">사진 저장</button>
+<p id="m">안 되면 사진을 길게 눌러 저장하세요.<br>1시간 뒤 자동으로 지워져요.</p>
+<section id="tl" hidden>
+  <h2>찍는 동안 타임랩스</h2>
+  <video id="vd" autoplay muted loop playsinline></video>
+  <button id="vs">영상 저장</button>
+</section>
+<script>
+// n = 부스가 올린 파일 이름 (Supabase nekeot 버킷), i = 사진 전체 주소 (예전 방식), v = 타임랩스 영상 확장자 (같은 이름)
+const SB_PUBLIC = 'https://khmkdznemafpjoyqgrnl.supabase.co/storage/v1/object/public/nekeot/';
+// l = Supabase가 영상을 안 받을 때 Litterbox에 올린 영상 파일 이름 (litter.catbox.moe/<l>, 1시간)
+const q = new URLSearchParams(location.search), n = q.get('n') || '', ok = /^[\w.-]+$/.test(n), l = q.get('l') || '';
+const lit = /^[\w-]+\.(mp4|webm)$/.exec(l), ext = lit ? lit[1] : q.get('v');
+const src = ok ? SB_PUBLIC + n + '.jpg' : (q.get('i') || '');
+// 사진 주소는 https만 (다른 형식은 무시)
+if (/^https:\/\//.test(src)) p.src = src; else { p.hidden = s.hidden = true; m.textContent = '사진 주소가 올바르지 않아요.'; }
+h.textContent = document.title = (q.get('t') || '네컷').slice(0, 30);
+p.onerror = () => { p.hidden = s.hidden = true; m.textContent = '사진이 없어요. 1시간이 지나 지워졌을 수 있어요.'; };
+const vsrc = lit ? 'https://litter.catbox.moe/' + l : ok && (ext === 'mp4' || ext === 'webm') ? SB_PUBLIC + n + '.' + ext : '';
+if (vsrc) { vd.src = vsrc; tl.hidden = false; vd.onerror = () => tl.hidden = true; }
+// 아이폰은 공유 창(→ 이미지/비디오 저장 = 사진 앱), 그 외는 파일 다운로드
+async function save(btn, url, name, type) {
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = '저장하는 중…';
+  try {
+    const b = await (await fetch(url)).blob(), f = new File([b], name, {type});
+    if (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && navigator.canShare && navigator.canShare({files: [f]})) await navigator.share({files: [f]});
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click(); }
+    btn.textContent = label;
+  } catch (e) {
+    if (e.name === 'AbortError') btn.textContent = label;
+    else { btn.textContent = label; location.href = url; } // 다른 사이트(Litterbox)라 파일로 못 받으면 영상을 그대로 열기 → 길게 눌러 저장
+  }
+  btn.disabled = false;
+}
+s.onclick = () => save(s, src, 'nekeot.jpg', 'image/jpeg');
+vs.onclick = () => save(vs, vsrc, 'nekeot-timelapse.' + ext, 'video/' + ext);
+</script>
+</html>
