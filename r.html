@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko">
-<!-- 폰으로 받기 페이지: 부스 QR이 r.html?i=<사진 주소>&t=<제목> 으로 엶. 사진 + "사진 저장" 버튼 (사진은 1시간 뒤 자동 삭제) -->
+<!-- 폰으로 받기 페이지: 부스 QR이 r.html?n=<사진 이름>&t=<제목>(&l=en) 으로 엶. 사진 + "사진 저장" 버튼. 사진은 Supabase 비공개 저장 공간에 있고 함수 nekeot가 1시간 안에만 보여 줌 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>네컷</title>
@@ -16,23 +16,26 @@ p{margin:0;color:#4A4E57;font-size:14px;line-height:1.6}
 <button id="s">사진 저장</button>
 <p id="m">안 되면 사진을 길게 눌러 저장하세요.<br>1시간 뒤 자동으로 지워져요.</p>
 <script>
-// n = 부스가 올린 파일 이름 (Supabase nekeot 버킷), i = 사진 전체 주소 (예전 방식)
-const SB_PUBLIC = 'https://khmkdznemafpjoyqgrnl.supabase.co/storage/v1/object/public/nekeot/';
+// n = 함수 nekeot가 정한 사진 이름 (supabase/functions/nekeot), i = 사진 전체 주소 (예전 Litterbox 방식)
+const PHOTO_FN = 'https://khmkdznemafpjoyqgrnl.supabase.co/functions/v1/nekeot';
 const q = new URLSearchParams(location.search), n = q.get('n') || '', name = 'nekeot.jpg';
-const src = /^[\w.-]+$/.test(n) ? SB_PUBLIC + n + '.jpg' : (q.get('i') || '');
+// l=en: 영어 (유학생 행사 부스)
+const EN = q.get('l') === 'en', say = (ko, en) => EN ? en : ko;
+if (EN) { document.documentElement.lang = 'en'; s.textContent = 'Save photo'; m.innerHTML = 'If it does not work, press and hold the photo to save it.<br>It is deleted after 1 hour.'; }
+const src = /^nekeot_\d{13}_[0-9a-f]{16}$/.test(n) ? `${PHOTO_FN}?n=${n}` : (q.get('i') || '');
 // 사진 주소는 https만 (다른 형식은 무시)
-if (/^https:\/\//.test(src)) p.src = src; else { p.hidden = s.hidden = true; m.textContent = '사진 주소가 올바르지 않아요.'; }
+if (/^https:\/\//.test(src)) p.src = src; else { p.hidden = s.hidden = true; m.textContent = say('사진 주소가 올바르지 않아요.', 'This photo link is not valid.'); }
 h.textContent = document.title = (q.get('t') || '네컷').slice(0, 30);
-p.onerror = () => { p.hidden = s.hidden = true; m.textContent = '사진이 없어요. 1시간이 지나 지워졌을 수 있어요.'; };
+p.onerror = () => { p.hidden = s.hidden = true; m.textContent = say('사진이 없어요. 1시간이 지나 지워졌을 수 있어요.', 'The photo is gone. It may have been deleted after 1 hour.'); };
 // 아이폰은 공유 창(→ 이미지 저장 = 사진 앱), 그 외는 파일 다운로드
 s.onclick = async () => {
-  s.disabled = true; s.textContent = '저장하는 중…';
+  s.disabled = true; s.textContent = say('저장하는 중…', 'Saving…');
   try {
     const b = await (await fetch(src)).blob(), f = new File([b], name, {type: 'image/jpeg'});
     if (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && navigator.canShare && navigator.canShare({files: [f]})) await navigator.share({files: [f]});
     else { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click(); }
-    s.textContent = '사진 저장';
-  } catch (e) { s.textContent = e.name === 'AbortError' ? '사진 저장' : '다시 눌러 주세요'; }
+    s.textContent = say('사진 저장', 'Save photo');
+  } catch (e) { s.textContent = e.name === 'AbortError' ? say('사진 저장', 'Save photo') : say('다시 눌러 주세요', 'Please tap again'); }
   s.disabled = false;
 };
 </script>
